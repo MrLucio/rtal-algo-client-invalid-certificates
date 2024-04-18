@@ -1,3 +1,4 @@
+use base64::Engine;
 use futures_util::{Sink, Stream};
 use std::{
     fmt::Display,
@@ -12,14 +13,15 @@ use crate::{
     util::oneshot_request,
 };
 
-pub fn resolve_login_file(cred_file: Option<PathBuf>) -> Result<PathBuf, String> {
+pub fn resolve_login_file(cred_file: Option<PathBuf>, server_url: &str) -> Result<PathBuf, String> {
     Ok(match cred_file {
         Some(x) => x,
         None => {
             let mut path = dirs::config_dir()
                 .ok_or("Cannot find config directory, manually specify the cred_file")?;
-            path.push("rtal");
-            path.push("login.token");
+            path.push("rtal-");
+            path.push(base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(server_url));
+            path.push("-login.token");
             path
         }
     })

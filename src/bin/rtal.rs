@@ -275,7 +275,7 @@ impl Command {
                     token: {
                         let auth_file = match cred_file {
                             Some(x) => x,
-                            None => auth::resolve_login_file(None)?,
+                            None => auth::resolve_login_file(None, uri)?,
                         };
                         let login_data = auth::load_credentials(&auth_file);
                         if let Ok(creds) = login_data {
@@ -419,7 +419,7 @@ impl Command {
                 Ok(())
             }
             Command::Login { cred_file } => {
-                let login_file = auth::resolve_login_file(cred_file)?;
+                let login_file = auth::resolve_login_file(cred_file, uri)?;
                 if get_valid_credentials(wsout, wsin, ask_to_exit, &login_file)
                     .await
                     .is_ok()
@@ -432,7 +432,7 @@ impl Command {
                 auth::do_client_authentication(wsout, wsin, ask_to_exit, &login_file, uri).await
             }
             Command::Logout { cred_file } => {
-                let login_file = auth::resolve_login_file(cred_file)?;
+                let login_file = auth::resolve_login_file(cred_file, uri)?;
                 auth::do_logout(&login_file)
             }
         }
