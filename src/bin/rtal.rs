@@ -16,13 +16,16 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::str::FromStr;
 use tokio::io::{stdin, stdout, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::net::TcpStream;
 use tokio::process as proc;
 use tokio::runtime::Runtime;
 use tokio::select;
 use tokio_tungstenite::tungstenite::protocol::Message;
 use tokio_tungstenite::tungstenite::Error as TsError;
-use tokio_tungstenite::{connect_async, MaybeTlsStream};
 use tracing::{error, warn};
+use tokio_tungstenite::client_async_tls_with_config;
+use native_tls::TlsConnector;
+use tokio_tungstenite::Connector;
 
 const BUFFER_SIZE: usize = 1 << 16;
 
@@ -556,18 +559,14 @@ where
 }
 
 async fn start(args: CliArgs, ask_to_exit: &mut bool) -> Result<(), String> {
-    let mut ws = match connect_async(&args.server_url).await {
+    let connector = TlsConnector::builder().danger_accept_invalid_certs(true).build().unwrap();
+    let tcp = TcpStream::connect("ta.di.univr.it:443").await.expect("Failed to connect");
+
+    let mut ws = match client_async_tls_with_config(&args.server_url, tcp, None, Some(Connector::NativeTls(connector))).await {
         Ok(x) => x.0,
         Err(x) => return Err(format!("Cannot connect to \"{}\": {}", args.server_url, x)),
     };
-    let result = match ws.get_mut() {
-        &mut MaybeTlsStream::Plain(ref mut x) => x.set_nodelay(true),
-        &mut MaybeTlsStream::Rustls(ref mut x) => x.get_mut().0.set_nodelay(true),
-        &mut _ => unreachable!("Using stream other than Plain or Rustls"),
-    };
-    if let Err(x) = result {
-        warn!("Cannot set TCP_NODELAY: {}", x);
-    }
+
     let (mut wsout, mut wsin) = ws.split();
     let handshake_request = match Request::forge(&Request::Handshake {
         magic: proto::MAGIC.to_string(),
